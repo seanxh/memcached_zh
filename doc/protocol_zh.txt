@@ -13,7 +13,7 @@ protocol.") A given running memcached server listens on some
 (configurable) port; clients connect to that port, send commands to
 the server, read responses, and eventually close the connection.
 
-关闭会话不需要发送任何命令。客户端可以在随时关闭连接。注意，虽然memcached的设计可以非常高效的
+关闭会话不需要发送任何命令。客户端可以随时关闭连接。注意，虽然memcached的设计可以非常高效的
 处理大量（几百，有需要时也可以上千）连接，但我们还是建议客户端缓存他们的连接，而不是每次读写数据
 时重新打开它。缓存连接可以节省建立TCP连接的开销（相比之下，服务器端创建一个新连接的开销可以忽略不讲）。
 There is no need to send any command to end the session. A client may
@@ -1119,12 +1119,17 @@ slab. (total_chunks * chunk_size) - mem_requested shows memory
 wasted in a slab class.  If you see a lot of waste, consider tuning
 the slab factor.
 
-
+连接统计信息
 Connection statistics
 ---------------------
+
+带有"conns"参数的"stats"命令返回当前活动连接信息和正在准备监听新连接的socket.
+返回格式如下：
 The "stats" command with the argument of "conns" returns information
 about currently active connections and about sockets that are listening
 for new connections. The data is returned in the format:
+
+* 译者注：此命令需在>=1.4.18版本的memcached服务器
 
 STAT <file descriptor>:<stat> <value>\r\n
 
@@ -1133,17 +1138,25 @@ The server terminates this list with the line
 
 END\r\n
 
+返回中"stat"位置的关键字可能是以下几种：
 The following "stat" keywords may be present:
 
 |---------------------+------------------------------------------------------|
+| 名称                 | 含义                                                 |
 | Name                | Meaning                                              |
 |---------------------+------------------------------------------------------|
-| addr                | The address of the remote side. For listening        |
+| addr                | 对端的地址。如果是监听socket的话这就是监听的地址。         |
+|                     | 注意有些socket类型（比如UNIX-domain)没有确切的远端地址    |
+|                     | The address of the remote side. For listening        |
 |                     | sockets this is the listen address. Note that some   |
 |                     | socket types (such as UNIX-domain) don't have        |
 |                     | meaningful remote addresses.                         |
-| state               | The current state of the connection. See below.      |
-| secs_since_last_cmd | The number of seconds since the most recently        |
+| state               | 连接的当前状态。见下表                                  |
+|                     | The current state of the connection. See below.      |
+| secs_since_last_cmd | 自最后一个命令处理至今的秒数。此数字是以命令开始处理时间为准  |
+|                     | 所以如果"state"显示一个命令正在运行，此处的秒数就是指当前命令|
+|                     | 运行的时间                                             |
+|                     | The number of seconds since the most recently        |
 |                     | issued command on the connection. This measures      |
 |                     | the time since the start of the command, so if       |
 |                     | "state" indicates a command is currently executing,  |
@@ -1151,34 +1164,54 @@ The following "stat" keywords may be present:
 |                     | command has been running.                            |
 |---------------------+------------------------------------------------------|
 
+"state"的值可能是下表中的一个：
 The value of the "state" stat may be one of the following:
 
 |----------------+-----------------------------------------------------------|
+| 名称            | 含义                                                      |
 | Name           | Meaning                                                   |
 |----------------+-----------------------------------------------------------|
-| conn_closing   | Shutting down the connection.                             |
-| conn_listening | Listening for new connections or a new UDP request.       |
-| conn_mwrite    | Writing a complex response, e.g., to a "get" command.     |
-| conn_new_cmd   | Connection is being prepared to accept a new command.     |
-| conn_nread     | Reading extended data, typically for a command such as    |
+| conn_closing   | 正在关闭连接                                                |
+|                | Shutting down the connection.                             |
+| conn_listening | 正在监听一个新连接或新的UDP请求                               |
+|                | Listening for new connections or a new UDP request.       |
+| conn_mwrite    | 正在回写一个复杂的返回，比如："get"命令                        |
+|                | Writing a complex response, e.g., to a "get" command.     |
+| conn_new_cmd   | 请求准备正在准备接收一个新命令                                |
+|                | Connection is being prepared to accept a new command.     |
+| conn_nread     | 正在读扩展数据，比较典型的命令是"set"和"put"                   |
+|                | Reading extended data, typically for a command such as    |
 |                | "set" or "put".                                           |
-| conn_parse_cmd | The server has received a command and is in the middle    |
+| conn_parse_cmd | 服务端已经接收到一个命令，正在解析或执行它。                    |
+|                | The server has received a command and is in the middle    |
 |                | of parsing it or executing it.                            |
-| conn_read      | Reading newly-arrived command data.                       |
-| conn_swallow   | Discarding excess input, e.g., after an error has         |
+| conn_read      | 正在读刚刚送达的命令数据                                     |
+|                | Reading newly-arrived command data.                       |
+| conn_swallow   | 丢弃剩余的输入，比如,当错误已经发生时                          |
+|                | Discarding excess input, e.g., after an error has         |
 |                | occurred.                                                 |
-| conn_waiting   | A partial command has been received and the server is     |
+| conn_waiting   | 命令的部分数据已经接收，服务端正在等待剩余的部分                 |
+|                |（注意与conn_nread的区别）                                   |
+|                | A partial command has been received and the server is     |
 |                | waiting for the rest of it to arrive (note the difference |
 |                | between this and conn_nread).                             |
-| conn_write     | Writing a simple response (anything that doesn't involve  |
+| conn_write     | 正在写一个简单的返回（不涉及到返回多行数据的返回值时）            |
+|                | Writing a simple response (anything that doesn't involve  |
 |                | sending back multiple lines of response data).            |
 |----------------+-----------------------------------------------------------|
 
 
 
+其它命令
 Other commands
 --------------
 
+"flush_all"有一个可选的数字参数。它总是成功，服务端返回"OK\r\n"（除非指定最后一个参数
+指定为"noreply"参数）。它的作用是立即（默认）废弃所有存在的数据项或在指定的过期时间后。
+在废弃后，所有的数据项都不会再在读取命令中返回（除非在flush_all后又用一个相同的key
+存储数据）。flush_all并不真正释放已经存在数据所占用的内存；这个过程会随着新数据的
+存储逐渐发生。关于flush_all会做什么的最精确的定义应该是这样：它会导致所有数据项的
+更新时间早于flush_all执行的时间以忽略所有的获取请求。
 "flush_all" is a command with an optional numeric argument. It always
 succeeds, and the server sends "OK\r\n" in response (unless "noreply"
 is given as the last parameter). Its effect is to invalidate all
@@ -1192,6 +1225,9 @@ definition of what flush_all does is the following: it causes all
 items whose update time is earlier than the time at which flush_all
 was set to be executed to be ignored for retrieval purposes.
 
+flush_all延迟功能的用途是，当你在配置一个memcached服务池时，你需要清除所有
+内容，你可以不需要同时清除所有memcached服务器上的信息（这会导致所有的客户端突然
+都需要重建缓存而穿透到db上，############否则在memcahced守护进程上被发现#########）。
 The intent of flush_all with a delay, was that in a setting where you
 have a pool of memcached servers, and you need to flush all content,
 you have the option of not resetting all memcached servers at the
@@ -1199,37 +1235,51 @@ same time (which could e.g. cause a spike in database load with all
 clients suddenly needing to recreate content that would otherwise
 have been found in the memcached daemon).
 
+这个延迟选项允许你将他们设置为每隔10秒（第一个服务器设置0，第二个设置为10，
+第三个设置为20，依次类推。。。。）
 The delay option allows you to have them reset in e.g. 10 second
 intervals (by passing 0 to the first, 10 to the second, 20 to the
 third, etc. etc.).
 
-
+"version"是一个没有参数的命令：
 "version" is a command with no arguments:
 
 version\r\n
 
+服务器端返回：
 In response, the server sends
 
+
+"VERSION <version>\r\n",<version>是服务器端的版本信息
 "VERSION <version>\r\n", where <version> is the version string for the
 server.
 
+"verbosity"是带有一个数字参数的命令。它总是成功，服务端返回"OK\r\n"（除非
+将最近一个参数设置为"noreply"）。它的作用是设置verbosity（调试信息）的
+日志输出级别。
 "verbosity" is a command with a numeric argument. It always succeeds,
 and the server sends "OK\r\n" in response (unless "noreply" is given
 as the last parameter). Its effect is to set the verbosity level of
 the logging output.
 
+"quit"是一个没有参数的命令：
 "quit" is a command with no arguments:
 
 quit\r\n
 
+服务器端一接收到这个命令，它就是关闭连接。其实，客户端随时关闭连接而不需要处理这个命令。
 Upon receiving this command, the server closes the
 connection. However, the client may also simply close the connection
 when it no longer needs it, without issuing this command.
 
 
+UDP协议
 UDP protocol
 ------------
 
+对于大型系统由于其客户端数量非常多，会导致大量的TCP连接从而引发规模的问题，这时
+还有一个基于UDP的端口。UDP接口不提供可靠的传输，所以只能用于不太在意成功与否的操作；
+比较典型的是"get"命令，丢失货未不完成的请求只要简单的当作未命中缓存即可。
 For very large installations where the number of clients is high enough
 that the number of TCP connections causes scaling difficulties, there is
 also a UDP-based interface. The UDP interface does not provide guaranteed
@@ -1237,6 +1287,10 @@ delivery, so should only be used for operations that aren't required to
 succeed; typically it is used for "get" requests where a missing or
 incomplete response can simply be treated as a cache miss.
 
+每个UDP报文包含一个简单的框架头，随后跟着一些和TCP协议里描述格式完成一样的数据。
+在当前的实现版本里，请求必须包含在一个UDP报文中，但是返回信息可能会分散在几个报文中。
+（常用的，包含多个key的"get"和"set"请求需要多个报文，
+当然其实这种请求适合更可靠的TCP传输）
 Each UDP datagram contains a simple frame header, followed by data in the
 same format as the TCP protocol described above. In the current
 implementation, requests must be contained in a single UDP datagram, but
@@ -1245,14 +1299,22 @@ span multiple datagrams are huge multi-key "get" requests and "set"
 requests, both of which are more suitable to TCP transport for reliability
 reasons anyway.)
 
+框架头是一个8字节的长整型，格式如下（所有值都是16比特的网络字节序，即大字节充BE）：
 The frame header is 8 bytes long, as follows (all values are 16-bit integers
 in network byte order, high byte first):
 
+0-1 请求ID
 0-1 Request ID
+2-3 序号
 2-3 Sequence number
+4-5 此数据报中报文的个数
 4-5 Total number of datagrams in this message
+6-7 未来备用，现在必须是0
 6-7 Reserved for future use; must be 0
 
+请求ID由客户提供。客户端可以使用任何整数当作请求ID，简单的可以是一个从随机数开始单调递增的数。
+服务端返回值会包含和这个请求ID。当在同一个服务端有多个请求同时处理时，客户端使用请求ID区分来区分
+不同的请求返回；带有未知请求ID的报文可能会导致将其返回值输出给上一个请求，应当被丢弃。
 The request ID is supplied by the client. Typically it will be a
 monotonically increasing value starting from a random seed, but the client
 is free to use whatever request IDs it likes. The server's response will
@@ -1262,6 +1324,8 @@ several pending from the same server; any datagrams with an unknown request
 ID are probably delayed responses to an earlier request and should be
 discarded.
 
+序号是0-(n-1)的数，n是报文中数据的总片数。客户端需要做的是根据序号顺序将这些有效碎片串联起来；
+返回的字节流同TCP协议返回一样（也包含\r\n终止符）。
 The sequence number ranges from 0 to n-1, where n is the total number of
 datagrams in the message. The client should concatenate the payloads of the
 datagrams for a given response in sequence number order; the resulting byte
