@@ -677,7 +677,7 @@ a number of lines which look like this:
 
 STAT <name> <value>\r\n
 
-返回信息的在这一行终止
+服务端返回在这一行终止
 The server terminates this list with the line
 
 END\r\n
@@ -835,138 +835,222 @@ slab class可能会导致OOM。在比较老的版本上，memcached会崩溃。�
 并且lrutail_reflocked计数器加1。如果你比较关心客户端卡住的情况，可以看一下这个计数器。
 参考：https://code.google.com/p/memcached/wiki/ReleaseNotes1421
 
+设置项统计
 Settings statistics
 -------------------
+警告：本节所描述的统计信息未来会变更。
 CAVEAT: This section describes statistics which are subject to change in the
 future.
 
+带"setting"参数的"stats"命令返回正在运行的memcached的详细设置。
+返回值依赖于具体的命令选项。
 The "stats" command with the argument of "settings" returns details of
 the settings of the running memcached.  This is primarily made up of
 the results of processing commandline options.
 
+注意，返回值并不保证一定按此顺序，且此列表有可能不够详细。否则，返回值应该类似于其它stats命令。
 Note that these are not guaranteed to return in any specific order and
 this list may not be exhaustive.  Otherwise, this returns like any
 other stats command.
 
 |-------------------+----------+----------------------------------------------|
+| 名称                   | 类型    | 含义                                           |
 | Name              | Type     | Meaning                                      |
 |-------------------+----------+----------------------------------------------|
-| maxbytes          | size_t   | Maximum number of bytes allows in this cache |
-| maxconns          | 32       | Maximum number of clients allowed.           |
-| tcpport           | 32       | TCP listen port.                             |
-| udpport           | 32       | UDP listen port.                             |
-| inter             | string   | Listen interface.                            |
-| verbosity         | 32       | 0 = none, 1 = some, 2 = lots                 |
-| oldest            | 32u      | Age of the oldest honored object.            |
-| evictions         | on/off   | When off, LRU evictions are disabled.        |
-| domain_socket     | string   | Path to the domain socket (if any).          |
-| umask             | 32 (oct) | umask for the creation of the domain socket. |
-| growth_factor     | float    | Chunk size growth factor.                    |
-| chunk_size        | 32       | Minimum space allocated for key+value+flags. |
-| num_threads       | 32       | Number of threads (including dispatch).      |
-| stat_key_prefix   | char     | Stats prefix separator character.            |
-| detail_enabled    | bool     | If yes, stats detail is enabled.             |
-| reqs_per_event    | 32       | Max num IO ops processed within an event.    |
-| cas_enabled       | bool     | When no, CAS is not enabled for this server. |
-| tcp_backlog       | 32       | TCP listen backlog.                          |
-| auth_enabled_sasl | yes/no   | SASL auth requested and enabled.             |
-| item_size_max     | size_t   | maximum item size                            |
-| maxconns_fast     | bool     | If fast disconnects are enabled              |
-| hashpower_init    | 32       | Starting size multiplier for hash table      |
-| slab_reassign     | bool     | Whether slab page reassignment is allowed    |
-| slab_automove     | bool     | Whether slab page automover is enabled       |
-| hash_algorithm    | char     | Hash table algorithm in use                  |
-| lru_crawler       | bool     | Whether the LRU crawler is enabled           |
-| lru_crawler_sleep | 32       | Microseconds to sleep between LRU crawls     |
-| lru_crawler_tocrawl| 32u     | Max items to crawl per slab per run          |
+| maxbytes          | size_t   | 此缓存中所允许的最大字节数                       |
+|                   |          | Maximum number of bytes allows in this cache |
+| maxconns          | 32       | 允许的最多客户端的数量                          |
+|                   |          | Maximum number of clients allowed.           |
+| tcpport           | 32       | TCP监听端口                                   |
+|                   |          | TCP listen port.                             |
+| udpport           | 32       | UDP监听端口                                   |
+|                   |          | UDP listen port.                             |
+| inter             | string   | 监听接口                                      |
+|                   |          | Listen interface.                            |
+| verbosity         | 32       | 0=否，1=一些，2=很多                           |
+|                   |          | 0 = none, 1 = some, 2 = lots                 |
+| oldest            | 32u      | 最老的对象的年龄。                              |
+|                   |          | Age of the oldest honored object.            |
+| evictions         | on/off   | 当off时，关闭LRU剔除                           |
+|                   |          | When off, LRU evictions are disabled.        |
+| domain_socket     | string   | 域套接字的文件路径（如果有的话）                  |
+|                   |          | Path to the domain socket (if any).          |
+| umask             | 32 (oct) | 域套接字文件创建时的umask                       |
+|                   |          | umask for the creation of the domain socket. |
+| growth_factor     | float    | chunk大小的增长因子                            |
+|                   |          | Chunk size growth factor.                    |
+| chunk_size        | 32       | key+value+flags的最小字节大小                  |
+|                   |          | Minimum space allocated for key+value+flags. |
+| num_threads       | 32       | 线程数量（包含分发线程）                         |
+|                   |          | Number of threads (including dispatch).      |
+| stat_key_prefix   | char     | 统计前缀分隔符                                 |
+|                   |          | Stats prefix separator character.            |
+| detail_enabled    | bool     | 如果是yes,详细状态展示被打开                     |
+|                   |          | If yes, stats detail is enabled.             |
+| reqs_per_event    | 32       | 一个event事件中处理IO ops的最大数量              |
+|                   |          | Max num IO ops processed within an event.    |
+| cas_enabled       | bool     | 如果是no，服务端的CAS功能被关闭                  |
+|                   |          | When no, CAS is not enabled for this server. |
+| tcp_backlog       | 32       | TCP监听积压                                   |
+|                   |          | TCP listen backlog.                          |
+| auth_enabled_sasl | yes/no   | SASL认证请求开关                               |
+|                   |          | SASL auth requested and enabled.             |
+| item_size_max     | size_t   | 数据项元素的最大值                              |
+|                   |          | maximum item size                            |
+| maxconns_fast     | bool     | 快速断开连接开关                               |
+|                   |          | If fast disconnects are enabled              |
+| hashpower_init    | 32       | 哈希表倍增器的初始大小                          |
+|                   |          | Starting size multiplier for hash table      |
+| slab_reassign     | bool     | 是否允许slab page重新分配                      |
+|                   |          | Whether slab page reassignment is allowed    |
+| slab_automove     | bool     | 是否slab page自移到打开                        |
+|                   |          | Whether slab page automover is enabled       |
+| hash_algorithm    | char     | 正在使用的哈希表算法                            |
+|                   |          | Hash table algorithm in use                  |
+| lru_crawler       | bool     | LRU爬虫是否打开                                |
+|                   |          | Whether the LRU crawler is enabled           |
+| lru_crawler_sleep | 32       | LRU爬虫间隔时间（毫秒数）                       |
+|                   |          | Microseconds to sleep between LRU crawls     |
+| lru_crawler_tocrawl| 32u     | LRU爬虫在每个slab上爬行的最大数据项个数           |
+|                   |          | Max items to crawl per slab per run          |
 |-------------------+----------+----------------------------------------------|
 
 
+数据项统计
 Item statistics
 ---------------
+警告：本节所描述的统计信息未来会变更。
 CAVEAT: This section describes statistics which are subject to change in the
 future.
 
+带"items"参数的"stats"命令每个slab class所存储数据项的信息。返回格式如下：
 The "stats" command with the argument of "items" returns information about
 item storage per slab class. The data is returned in the format:
 
 STAT items:<slabclass>:<stat> <value>\r\n
 
+服务端返回在此行终止
 The server terminates this list with the line
 
 END\r\n
 
+"stats slabs"命令返回结果的slabclass以class ID排列。"stats slabs"描述slab大小和
+内存使用情况，"stats items"显示更高一层的信息。
 The slabclass aligns with class ids used by the "stats slabs" command. Where
 "stats slabs" describes size and memory usage, "stats items" shows higher
 level information.
 
+###################
+以下列出项目的值被定义为写作。
 The following item values are defined as of writing.
+###################
 
+名称                    含义
 Name                   Meaning
 ------------------------------
+number                 当前存储在此slab class中的元素个数。已经过期的会被自动除去。
 number                 Number of items presently stored in this class. Expired
 items are not automatically excluded.
+
+age                    LRU中最老的数据项的年龄
 age                    Age of the oldest item in the LRU.
+
+evicted                LRU剔除的未过期的数据项的个数
 evicted                Number of times an item had to be evicted from the LRU
 before it expired.
+
+evicted_nonzero        有明确过期时间的数据项总数
 evicted_nonzero        Number of times an item which had an explicit expire
-time set had to be evicted from the LRU before it
-expired.
+time set had to be evicted from the LRU before it expired.
+
+evicted_time           此slab class最近一次剔除元素至今的秒数。
+可以用此判断你最近是否剔除数据。
 evicted_time           Seconds since the last access for the most recent item
 evicted from this class. Use this to judge how
 recently active your evicted data is.
+
+outofmemory            底层的slab class不能存储新元素的次数。这意味着你在以-M模式运行
+或剔除旧元素失败。
 outofmemory            Number of times the underlying slab class was unable to
 store a new item. This means you are running with -M or
 an eviction failed.
+
+tailrepairs            自动修复引用计数漏洞的次数。如果你发现这个数据很大，请将你的
+情况报告给Memcached的开发人员。
 tailrepairs            Number of times we self-healed a slab with a refcount
 leak. If this counter is increasing a lot, please
 report your situation to the developers.
+
+reclaimed              新元素被存储在已过期元素的槽中的次数。
 reclaimed              Number of times an entry was stored using memory from
 an expired entry.
+
+expired_unfetched      自创建至被LRU过期回收，从来没有被访问过的数据项的个数
 expired_unfetched      Number of expired items reclaimed from the LRU which
 were never touched after being set.
+
+evicted_unfetched      自创建至被LRU强制剔除，从来没有被访问过的数据项的个数。
 evicted_unfetched      Number of valid items evicted from the LRU which were
 never touched after being set.
+
+crawler_reclaimed      被LRU爬虫释放到的数据项的个数。
 crawler_reclaimed      Number of items freed by the LRU Crawler.
 
+注意，此列表只显示存在数据的slab，空的缓存项会返回一个空集。
 Note this will only display information about slabs which exist, so an empty
 cache will return an empty set.
 
-
+数据项大小统计
 Item size statistics
 --------------------
+警告：本节所描述的统计信息未来会变更。
 CAVEAT: This section describes statistics which are subject to change in the
 future.
 
+带有"sizes"命令的"stats"返回缓存中slab的大小和存放在其中的数据项个数。
+注意：这个命令会给缓存加锁。他遍历每个数据基并计算他们各自的大小。尽管这个操作非常快，但如果
+你有很多数据项时，这有可能会导致memcached数秒内不能提供服务。
 The "stats" command with the argument of "sizes" returns information about the
 general size and count of all items stored in the cache.
 WARNING: This command WILL lock up your cache! It iterates over *every item*
 and examines the size. While the operation is fast, if you have many items
 you could prevent memcached from serving requests for several seconds.
 
+返回信息格式如下：
 The data is returned in the following format:
 
 <size> <count>\r\n
 
+服务端返回在这一行终止
 The server terminates this list with the line
 
 END\r\n
 
+###########################
+'size'是所存放数据项的一个近似大小（32位的整数）。
+'count'是在上面那个可以容纳'size'大小的slab中存放的数据项的个数。
 'size' is an approximate size of the item, within 32 bytes.
 'count' is the amount of items that exist within that 32-byte range.
 
+如果你有一个递增关系为32字节的一组slab class，这是一个数据项的最基本的展示。
+你可以用此数据决定调整slab增长因子是否可以节省内存开销。比如：如果你的数据项全部小于200字节，
+在大小较小的slab页中分出来更多的slab class，以使数据大小可以更贴近slab class的大小。
 This is essentially a display of all of your items if there was a slab class
 for every 32 bytes. You can use this to determine if adjusting the slab growth
 factor would save memory overhead. For example: generating more classes in the
 lower range could allow items to fit more snugly into their slab classes, if
 most of your items are less than 200 bytes in size.
+###########################
 
-
+Slab统计
 Slab statistics
 ---------------
+警告：本节所描述的统计信息未来会变更。
 CAVEAT: This section describes statistics which are subject to change in the
 future.
 
+带有"slabs"命令的"stats"命令返回每个slab运行时的信息。它包含了每个slab的信息和一些合计信息。
+数据格式如下：
 The "stats" command with the argument of "slabs" returns information about
 each of the slabs created by memcached during runtime. This includes per-slab
 information along with some totals. The data is returned in the format:
@@ -974,6 +1058,7 @@ information along with some totals. The data is returned in the format:
 STAT <slabclass>:<stat> <value>\r\n
 STAT <stat> <value>\r\n
 
+服务端返回在这一行终止
 The server terminates this list with the line
 
 END\r\n
@@ -981,31 +1066,53 @@ END\r\n
 |-----------------+----------------------------------------------------------|
 | Name            | Meaning                                                  |
 |-----------------+----------------------------------------------------------|
-| chunk_size      | The amount of space each chunk uses. One item will use   |
+| chunk_size      | 每个chunk可用的空间大小。数据项会依据大小选取可用的合适的chunk  |
+|                 | The amount of space each chunk uses. One item will use   |
 |                 | one chunk of the appropriate size.                       |
-| chunks_per_page | How many chunks exist within one page. A page by         |
+| chunks_per_page | 每个page里有多少个chunk。每个page默认小于等于1M。             |
+|                 | slab按page划分,然后再拆分成多个chunk                        |
+|                 | How many chunks exist within one page. A page by         |
 |                 | default is less than or equal to one megabyte in size.   |
 |                 | Slabs are allocated by page, then broken into chunks.    |
-| total_pages     | Total number of pages allocated to the slab class.       |
-| total_chunks    | Total number of chunks allocated to the slab class.      |
-| get_hits        | Total number of get requests serviced by this class.     |
-| cmd_set         | Total number of set requests storing data in this class. |
-| delete_hits     | Total number of successful deletes from this class.      |
-| incr_hits       | Total number of incrs modifying this class.              |
-| decr_hits       | Total number of decrs modifying this class.              |
-| cas_hits        | Total number of CAS commands modifying this class.       |
-| cas_badval      | Total number of CAS commands that failed to modify a     |
+| total_pages     | 当前slab class中分配的page总数                             |
+|                 | Total number of pages allocated to the slab class.       |
+| total_chunks    | 当前slab class中分配的chunk总数                            |
+|                 | Total number of chunks allocated to the slab class.      |
+| get_hits        | 当前slab class接收get命令命中数据项的次数                    |
+|                 | Total number of get requests serviced by this class.     |
+| cmd_set         | 当前slab class接受set存储数据的次数                         |
+|                 | Total number of set requests storing data in this class. |
+| delete_hits     | 当前slab class成功删除数据的总次数                          |
+|                 | Total number of successful deletes from this class.      |
+| incr_hits       | incr命令修改此class中元素的次数                             |
+|                 | Total number of incrs modifying this class.              |
+| decr_hits       | decr命令修改此class中元素的次数                             |
+|                 | Total number of decrs modifying this class.              |
+| cas_hits        | cas命令修改此class中元素的次数                              |
+|                 | Total number of CAS commands modifying this class.       |
+| cas_badval      | 由于cas ID不符导致cas命令更新数据失败的次数                   |
+|                 | Total number of CAS commands that failed to modify a     |
 |                 | value due to a bad CAS id.                               |
-| touch_hits      | Total number of touches serviced by this class.          |
-| used_chunks     | How many chunks have been allocated to items.            |
-| free_chunks     | Chunks not yet allocated to items, or freed via delete.  |
-| free_chunks_end | Number of free chunks at the end of the last allocated   |
+| touch_hits      | 当前class数据被touch的次数                                 |
+|                 | Total number of touches serviced by this class.          |
+| used_chunks     | 当前class已经分配给数据项的chunk个数                         |
+|                 | How many chunks have been allocated to items.            |
+| free_chunks     | 未分配出去的chunk数目，或通过删除释放的数目                    |
+|                 | Chunks not yet allocated to items, or freed via delete.  |
+| free_chunks_end | 最后分配的page的尾部空闲的chunk数目                          |
+|                 | Number of free chunks at the end of the last allocated   |
 |                 | page.                                                    |
-| mem_requested   | Number of bytes requested to be stored in this slab[*].  |
-| active_slabs    | Total number of slab classes allocated.                  |
-| total_malloced  | Total amount of memory allocated to slab pages.          |
+| mem_requested   | 请求存储在这个slab[*]中的数据的总字节数                       |
+|                 | Number of bytes requested to be stored in this slab[*].  |
+| active_slabs    | slab class已经分配的总数目                                 |
+|                 | Total number of slab classes allocated.                  |
+| total_malloced  | slab page申请的总内存空间大小                               |
+|                 | Total amount of memory allocated to slab pages.          |
 |-----------------+----------------------------------------------------------|
 
+* 数据项被存储在一个与数据本身大小相同或更大的slab中。mem_requested表示一个slab中所有
+数据项的总大小。(total_chunks*chunk_size)-mem_requested 表示一个slab class中
+浪费的内存大小。如果你发现浪费的比较多，考虑调整一下slab倍增器的大小。
 * Items are stored in a slab that is the same size or larger than the
 item.  mem_requested shows the size of all items within a
 slab. (total_chunks * chunk_size) - mem_requested shows memory
@@ -1021,6 +1128,7 @@ for new connections. The data is returned in the format:
 
 STAT <file descriptor>:<stat> <value>\r\n
 
+服务端返回在这一行终止
 The server terminates this list with the line
 
 END\r\n
